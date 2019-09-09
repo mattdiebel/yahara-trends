@@ -7,7 +7,9 @@ library(gridExtra)
 
 tp_mod <- make('tp_wy_out', remake_file = '30_analyze_data_series.yml')
 
-Daily = tp_mod$Daily
+tp_mod_Qc = tp_mod
+
+Daily = tp_mod_Qc$Daily
 Qs = BaseflowSeparation(Daily$Q)
 # Qs$Q = Qs$qft + Qs$bt
 Qs$qc = Qs$qft + 0.2
@@ -21,25 +23,25 @@ Daily$LogQ = log(Daily$Q)
 Sample = tp_mod$Sample
 Sample = merge(Sample,Daily[,c("Date","bt","qft")])
 INFO = tp_mod$INFO
-tp_mod = mergeReport(INFO,Daily,Sample)
+tp_mod_Qc = mergeReport(INFO,Daily,Sample)
 
 # Plotly for inspecting composite flow
 
 p1 = plot_ly(type="scatter", mode="lines")
 
-p1 = add_trace(p1,
-               data=Daily,
-               x=~Date,
-               y=~qc,
-               name="Composite flow",
-               line=list(width=1, color="orange"))
-
 # p1 = add_trace(p1,
 #                data=Daily,
 #                x=~Date,
-#                y=~Q,
-#                name="Stormflow",
+#                y=~qc,
+#                name="Composite flow",
 #                line=list(width=1, color="orange"))
+# 
+p1 = add_trace(p1,
+               data=Daily,
+               x=~Date,
+               y=~Q,
+               name="Stormflow",
+               line=list(width=1, color="blue"))
 # 
 # p1 = add_trace(p1,
 #                data=Daily,
@@ -61,7 +63,7 @@ parameters$name = paste0("windowQ = ",parameters$windowQ,", windowS = ",paramete
 
 for (p in 1:nrow(parameters)) {
   
-  tp_mod <- modelEstimation(tp_mod,
+  tp_mod_Qc <- modelEstimation(tp_mod_Qc,
                             windowQ = parameters$windowQ[p],
                             windowS = parameters$windowS[p],
                             windowY = parameters$windowY[p])
@@ -129,13 +131,17 @@ for (p in 1:nrow(parameters)) {
 }
 
 plotConcTimeSmooth(tp_mod, q1=0.2, q2=0.4, q3=1, centerDate="12-01", yearStart=1989, yearEnd=2018, logScale=TRUE)
-plotConcQSmooth(tp_mod, date1="1990-06-15", date2=NA, date3="2018-06-15", qLow=7, qHigh=350, qUnit=1, legendLeft=8,legendTop=1.1)
+plotConcQSmooth(tp_mod, date1="1990-01-15", date2=NA, date3="2018-01-15", qLow=10, qHigh=350, qUnit=1, legendLeft=12,legendTop=1.1)
 plotContours(tp_mod, 1989, 2018, 0.2, 5, contourLevels=seq(0,1.5,0.1), flowDuration = FALSE)
-plotDiffContours(tp_mod, year0=1990, year1=2018, qBottom=10, qTop=500,  qUnit=1, maxDiff=0.6, flowDuration = FALSE)
+plotDiffContours(tp_mod, year0=1990, year1=2018, qBottom=10, qTop=500, qUnit=1, maxDiff=1, flowDuration = FALSE)
+
+
+# Daily Streamflow Trend Analysis https://owi.usgs.gov/blog/Quantile-Kendall/
 
 source("C:/LWRD/yahara-trends/quantile_kendall.R")
-plotFlowTrend(tp_mod, istat=4)
+plotFlowTrend(tp_mod, istat=8)
 plotQuantileKendall(tp_mod)
+plotQuantileKendall(tp_mod, paStart=1, paLong=3)
 
 
 # Plot C-Q relationship by month and year
@@ -182,19 +188,36 @@ ggplot(Sample[Sample$qft<0.2,], aes(x=bt, y=residual, color=waterYear)) +
 dev.off()
 
 # Plotly for inspecting daily time series
+Daily = tp_mod$Daily
+Sample = tp_mod$Sample
+Daily_Qc = tp_mod_Qc$Daily
+Sample_Qc = tp_mod_Qc$Sample
+
 p1 = plot_ly(type="scatter", mode="lines")
 
 p1 = add_trace(p1,
      data=Daily,
      x=~Date,
      y=~ConcDay,
-     name="WRTDS Estimate",
-     line=list(width=1, color="gray"),
+     name="Original Q",
+     line=list(width=1, color="#e3550e"),
      hoverlabel=list(bgcolor="white"),
      hoverinfo="text", 
-     text=paste0("WRTDS Estimate", "<br>", 
+     text=paste0("Original Q", "<br>", 
                  format(Daily$Date, "%B %d, %Y"), "<br>", 
                  "TP: ", signif(Daily$ConcDay,3), " mg/L"))
+
+p1 = add_trace(p1,
+     data=Daily_Qc,
+     x=~Date,
+     y=~ConcDay,
+     name="Composite Q",
+     line=list(width=1, color="blue"),
+     hoverlabel=list(bgcolor="white"),
+     hoverinfo="text", 
+     text=paste0("Composite Q", "<br>", 
+                 format(Daily_Qc$Date, "%B %d, %Y"), "<br>", 
+                 "TP: ", signif(Daily_Qc$ConcDay,3), " mg/L"))
 
 p1 = add_trace(p1,
      data=Sample,
