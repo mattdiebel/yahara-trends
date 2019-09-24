@@ -21,7 +21,7 @@ plot(ConcAve~ConcHat, Sample, xlim=lims, ylim=lims, log="xy", main=plot_title)
 abline(0,1)
 dev.off()
 
-WY = tableResults(eList)
+WY = tableResults(eList, fluxUnit=13)
 colnames(WY) = c("WY","Q","Conc","FNConc","Flux","FNFlux")
 
 Sample = eList$Sample
@@ -66,7 +66,7 @@ plot(ConcAve~ConcHat_QSM, Sample, xlim=lims, ylim=lims, log="xy", main=plot_titl
 abline(0,1)
 dev.off()
 
-# Estimate yHat for Daily
+# Estimate Daily yHat
 estPtYear = Daily$DecYear
 estPtLQb = Daily$LogQb
 estPtLQq = Daily$LogQq
@@ -76,15 +76,20 @@ colnames(QSM_daily) = c("yHat","SE","ConcHat")
 
 Daily = cbind(Daily, QSM_daily)
 
-# Estimate FNConc for Daily
+# Estimate Daily FNConc and FNFlux
 wy = unique(Daily$waterYear)
 nyears = length(wy)
 ndays = nrow(Daily)
-Qreps = matrix(nrow=ndays, ncol=nyears)
+Creps = Freps = matrix(nrow=ndays, ncol=nyears)
 for (y in 1:nyears) {
   
   print(wy[y])
   flush.console()
+  
+  Q = Daily[Daily$waterYear==wy[y],c("Day","Q")]
+  repQ = merge(Daily[,c("Date","Day")], Q, all.x=TRUE)
+  repQ = repQ[order(repQ$Date),]
+  repQ$Q = approx(repQ$Date[!(is.na(repQ$Q))], repQ$Q[!(is.na(repQ$Q))], repQ$Date)$y
   
   LQb = Daily[Daily$waterYear==wy[y],c("Day","LogQb")]
   repLQb = merge(Daily[,c("Date","Day")], LQb, all.x=TRUE)
@@ -100,18 +105,28 @@ for (y in 1:nyears) {
 
   QSM_daily = runQSepReg(estPtYear, estPtLQb, estPtLQq, DecLow, DecHigh, localSample=Sample, windowY=windowY, windowQb=windowQb, windowQq=windowQq, windowS=windowS, minNumObs=minNumObs)
   colnames(QSM_daily) = c("yHat","SE","ConcHat")
-  Qreps[,y] = QSM_daily[,3]
+  Creps[,y] = QSM_daily[,3]
+  Freps[,y] = QSM_daily[,3] * repQ$Q * 86.4
 }
 
-FNConc_QSM = rowMeans(Qreps)
-Daily = cbind(Daily, FNConc_QSM)
-WY_QSM = aggregate(Daily[,c("waterYear","FNConc_QSM")], by=list(Daily$waterYear), FUN=mean)
-
-load("Yahara_WY_QSM.RData")
+FNConc_QSM = rowMeans(Creps)
+FNFlux_QSM = rowMeans(Freps)
+Daily = cbind(Daily, FNConc_QSM, FNFlux_QSM)
+eList$Daily = Daily
+save(eList, file="Yahara_TP.RData")
+WY_QSM_conc = aggregate(Daily[,c("waterYear","FNConc_QSM")], by=list(Daily$waterYear), FUN=mean)
+WY_QSM_flux = aggregate(Daily$FNFlux_QSM, by=list(Daily$waterYear), FUN=sum)
+colnames(WY_QSM_flux) = c("waterYear","FNFlux_QSM")
 
 png("Yahara_FNConc_annual_trend.png", res=300, height=1800, width=1800)
 plot(FNConc~WY, WY, type="l", xlab="", main="Yahara at Windsor")
-lines(FNConc_QSM~waterYear, WY_QSM, lty=2)
+lines(FNConc_QSM~waterYear, WY_QSM_conc, lty=2)
+legend("topright", lty=c(1,2), legend=c("WRTDS","QSM"), bty="n")
+dev.off()
+
+png("Yahara_FNFlux_annual_trend.png", res=300, height=1800, width=1800)
+plot(FNFlux~WY, WY, type="l", xlab="", main="Yahara at Windsor")
+lines(FNFlux_QSM~waterYear, WY_QSM_flux, lty=2)
 legend("topright", lty=c(1,2), legend=c("WRTDS","QSM"), bty="n")
 dev.off()
 
