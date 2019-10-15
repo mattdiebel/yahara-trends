@@ -1,8 +1,7 @@
-runQSepReg <- function(estPtYear,estPtLQb,estPtQq,DecLow,DecHigh,localSample,windowY=7,windowQb=1,windowQq=1,windowS=0.5,minNumObs=100){
-	localSample <- Sample
+runQSepReg <- function(estPtYear, estPtLQb, estPtLQq, DecLow, DecHigh, localSample, windowY, windowQb, windowQq, windowS, minNumObs) {
 	numSamples <- length(localSample$DecYear)
 	numEstPt <- length(estPtYear)
-	resultBaseReg <- array(0,c(numEstPt,3))
+	result <- array(0,c(numEstPt,3))
 	for ( i in 1:numEstPt){
 		tempWindowY <- windowY
 		tempWindowQq <- windowQq
@@ -24,8 +23,8 @@ runQSepReg <- function(estPtYear,estPtLQb,estPtQq,DecLow,DecHigh,localSample,win
 			weightQq <- triCube(Sam$LogQq - estLQq,tempWindowQq)
 			diffUpper <- ceiling(diffY)
 			diffLower <- floor(diffY)
-			diffSeason <- pmin(abs(diffUpper-diffY),abs(diffY-diffLower))
-			weightS <- triCube(diffSeason,tempWindowS)
+			diffSeason <- pmin(abs(diffUpper-diffY), abs(diffY-diffLower))
+			weightS <- triCube(diffSeason, tempWindowS)
 			Sam$weight <- weightY * weightQb * weightQq * weightS
 			Sam <- subset(Sam,weight>0)
 			numPosWt <- length(Sam$weight)
@@ -43,18 +42,18 @@ runQSepReg <- function(estPtYear,estPtLQb,estPtQq,DecLow,DecHigh,localSample,win
 		}
 		weight <- Sam$weight
 		aveWeight <- sum(weight)/numPosWt
-		weight <- weight / aveWeight
+		weight <- weight/aveWeight
 		Sam <- data.frame(Sam)
-		model <- lm(log(ConcAve)~DecYear+LogQb+LogQq+SinDY+CosDY,data=Sam,weights=weight)
+		model <- lm(log(ConcAve)~DecYear+LogQb+LogQq+SinDY+CosDY, data = Sam, weights = weight)
 		term1 <- 1 / model$df.residual
 		sumTerm <- sum(weight*(model$residual^2))
 		SE <- sqrt(term1 * sumTerm)
 		newdf <- data.frame(DecYear = estY, LogQb = estLQb, LogQq = estLQq, SinDY = sin(2 * pi * estY), CosDY = cos(2 * pi * estY))
 		yHat <- predict(model,newdf)
 		bias <- exp((SE^2)/2)
-		resultBaseReg[i,1] <- yHat
-		resultBaseReg[i,2] <- SE
-		resultBaseReg[i,3] <- bias * exp(yHat)
+		result[i,1] <- yHat
+		result[i,2] <- SE
+		result[i,3] <- bias * exp(yHat)
 	}
-	return(resultBaseReg)
+	return(result)
 }
